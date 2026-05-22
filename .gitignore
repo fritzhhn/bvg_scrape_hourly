@@ -6,5 +6,6 @@ venv/
 data/
 *.db
 dashboard/index.html
+# index.html at repo root is committed for GitHub Pages (main branch)
 .DS_Store
 .streamlit/

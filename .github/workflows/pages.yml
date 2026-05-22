@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pages: write
   id-token: write
 
@@ -37,7 +37,16 @@ jobs:
         run: |
           mkdir -p site
           cp dashboard/index.html site/index.html
-          touch site/.nojekyll
+          cp dashboard/index.html index.html
+          touch site/.nojekyll .nojekyll
+
+      - name: Commit root index.html (Pages from main branch)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add index.html .nojekyll
+          git diff --staged --quiet || git commit -m "Update dashboard [skip ci]"
+          git push
 
       - uses: actions/configure-pages@v4
 
