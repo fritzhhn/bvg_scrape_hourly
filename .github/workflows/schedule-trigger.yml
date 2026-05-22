@@ -1,0 +1,31 @@
+# Fires the scrape workflow every 20 minutes (UTC :00/:20/:40 = Berlin CEST :00/:20/:40).
+# Backup if the primary schedule on hourly.yml is delayed on new repos.
+name: BVG scrape schedule trigger
+
+on:
+  schedule:
+    - cron: "0,20,40 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+concurrency:
+  group: bvg-schedule-trigger
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: "hourly.yml",
+              ref: "main",
+            });
+            core.info("Dispatched BVG hourly scrape on main");

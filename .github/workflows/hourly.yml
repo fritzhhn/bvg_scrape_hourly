@@ -3,7 +3,7 @@ name: BVG hourly scrape
 
 on:
   schedule:
-    - cron: "*/20 * * * *"
+    - cron: "0,20,40 * * * *"
       timezone: Europe/Berlin
   workflow_dispatch:
     inputs:
@@ -14,6 +14,7 @@ on:
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: bvg-hourly
