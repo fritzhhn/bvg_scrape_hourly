@@ -1,4 +1,4 @@
-# Stündlicher BVG-Scrape + Dashboard auf GitHub Pages (Actions-Deploy, nicht README).
+# Stündlicher BVG-Scrape — ohne github-pages Environment (blockiert Schedule).
 name: BVG hourly scrape
 
 on:
@@ -13,20 +13,15 @@ on:
         default: false
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: bvg-pages
+  group: bvg-hourly
   cancel-in-progress: false
 
 jobs:
-  scrape-and-publish:
+  scrape:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -56,32 +51,15 @@ jobs:
       - name: Build dashboard
         run: python dashboard/build_html.py
 
-      - name: Prepare static site (only dashboard, not README)
+      - name: Publish dashboard to main (GitHub Pages)
         run: |
-          mkdir -p site
-          cp dashboard/index.html site/index.html
           cp dashboard/index.html index.html
-          touch site/.nojekyll .nojekyll
-
-      - name: Commit root index.html (Pages from main branch)
-        run: |
+          touch .nojekyll
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add index.html .nojekyll
-          git diff --staged --quiet || git commit -m "Update dashboard [skip ci]"
+          git diff --staged --quiet || git commit -m "Dashboard update [skip ci]"
           git push
-
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v4
-
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: site
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
 
       - name: Weekly DB backup artifact
         run: |
