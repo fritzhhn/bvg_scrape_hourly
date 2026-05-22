@@ -6,6 +6,8 @@ on:
     # :00/:20/:40 Berlin; +1 min avoids GitHub load spikes at minute 0 UTC-wide
     - cron: "1,21,41 * * * *"
       timezone: Europe/Berlin
+  repository_dispatch:
+    types: [scrape]
   workflow_dispatch:
     inputs:
       force:
