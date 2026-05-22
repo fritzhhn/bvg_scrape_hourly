@@ -29,14 +29,53 @@ LINE_TYPE_LABELS = {
 }
 
 
+def empty_payload() -> dict:
+    now = datetime.now().astimezone().isoformat()
+    return {
+        "meta": {
+            "collectedAt": None,
+            "collectedDay": None,
+            "collectedHour": None,
+            "timeFrame": "TODAY",
+            "disruptionType": "all",
+            "numFound": 0,
+            "generatedAt": now,
+            "totalSnapshots": 0,
+            "empty": True,
+        },
+        "disruptions": [],
+        "points": [],
+        "comparison": {
+            "new": [],
+            "gone": [],
+            "modified": [],
+            "new_count": 0,
+            "gone_count": 0,
+            "modified_count": 0,
+            "continued_count": 0,
+        },
+        "history": {
+            "totalSnapshots": 0,
+            "uniqueDisruptionsEver": 0,
+            "timeline": [],
+            "longestVisible": [],
+            "recentlyEnded": [],
+        },
+    }
+
+
 def load_payload(db_path: Path) -> dict:
+    if not db_path.exists():
+        return empty_payload()
+
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     snap = conn.execute(
         "SELECT * FROM snapshots ORDER BY collected_at DESC LIMIT 1"
     ).fetchone()
     if not snap:
-        raise SystemExit("Keine Snapshots in der Datenbank. Zuerst: python -m collector.collect")
+        conn.close()
+        return empty_payload()
 
     rows = conn.execute(
         """
@@ -196,6 +235,14 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     .badge.traffic { background: #3d2a14; color: #f5c26b; }
     .badge.elevator { background: #1e3a4a; color: #7ec8e3; }
     .note { font-size: .82rem; color: var(--muted); margin-top: .5rem; }
+    .banner-empty {
+      background: #2a3042;
+      border: 1px solid var(--bvg);
+      border-radius: 10px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
   </style>
 </head>
 <body>
@@ -208,6 +255,9 @@ HTML_TEMPLATE = """<!DOCTYPE html>
     </p>
   </header>
   <div class="wrap">
+    <div id="empty-banner" class="banner-empty" style="display:none">
+      Noch keine Scrape-Daten. Die Karte zeigt Berlin — nach dem ersten stündlichen Lauf (oder Actions-Run) erscheinen Störungen hier.
+    </div>
     <div class="metrics" id="metrics"></div>
     <div class="filters">
       <label>Meldungstyp
@@ -280,9 +330,16 @@ HTML_TEMPLATE = """<!DOCTYPE html>
   <script>
     const DATA = JSON.parse(document.getElementById("dashboard-data").textContent);
     const meta = DATA.meta;
-    document.getElementById("meta-time").textContent = new Date(meta.collectedAt).toLocaleString("de-DE");
-    document.getElementById("meta-filter").textContent =
-      `type=${meta.disruptionType}, timeFrame=${meta.timeFrame} (${meta.numFound} wie bvg.de) · ${meta.totalSnapshots||1} Snapshot(s)`;
+    if (meta.empty) {
+      document.getElementById("empty-banner").style.display = "block";
+      document.getElementById("meta-time").textContent = "Warte auf ersten Scrape…";
+      document.getElementById("meta-filter").textContent =
+        `type=${meta.disruptionType}, timeFrame=${meta.timeFrame} · 0 Snapshots`;
+    } else {
+      document.getElementById("meta-time").textContent = new Date(meta.collectedAt).toLocaleString("de-DE");
+      document.getElementById("meta-filter").textContent =
+        `type=${meta.disruptionType}, timeFrame=${meta.timeFrame} (${meta.numFound} wie bvg.de) · ${meta.totalSnapshots||1} Snapshot(s)`;
+    }
 
     let map, heatLayer, markers = [];
     let charts = {};
