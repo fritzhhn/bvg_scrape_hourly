@@ -1,0 +1,86 @@
+# Stündlicher BVG-Scrape — SQLite bleibt im Actions-Cache zwischen Läufen.
+# Öffentliches Repo: GitHub Actions Minutes sind kostenlos (Fair Use).
+name: BVG hourly scrape
+
+on:
+  schedule:
+    # Jede volle Stunde (:00) — Europe/Berlin (passt zu collector berlin_hour)
+    - cron: "0 * * * *"
+      timezone: Europe/Berlin
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Snapshot auch wenn diese Stunde schon existiert"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: bvg-hourly
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Restore SQLite database
+        uses: actions/cache@v4
+        with:
+          path: data/
+          key: disruptions-db-v1
+          restore-keys: |
+            disruptions-db-v1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run hourly collector
+        run: |
+          mkdir -p data/logs
+          ARGS=""
+          if [ "${{ inputs.force }}" = "true" ]; then ARGS="--force"; fi
+          python -m collector.hourly $ARGS --skip-html
+
+      - name: Rebuild dashboard (every 6th hour, Berlin)
+        run: |
+          H=$(TZ=Europe/Berlin date +%H)
+          if [ "$((10#$H % 6))" -eq 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            python dashboard/build_html.py
+          fi
+
+      - name: Deploy dashboard to GitHub Pages
+        if: hashFiles('dashboard/index.html') != ''
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: dashboard
+          publish_branch: gh-pages
+          keep_files: false
+          user_name: github-actions[bot]
+          user_email: github-actions[bot]@users.noreply.github.com
+
+      - name: Weekly DB backup artifact
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || \
+             { [ "$(date -u +%w)" = "0" ] && [ "$(date -u +%H)" = "00" ]; }; then
+            echo "upload_backup=true" >> "$GITHUB_ENV"
+          fi
+
+      - uses: actions/upload-artifact@v4
+        if: env.upload_backup == 'true'
+        with:
+          name: disruptions-db-backup-${{ github.run_number }}
+          path: data/disruptions.db
+          retention-days: 90
+          if-no-files-found: ignore
