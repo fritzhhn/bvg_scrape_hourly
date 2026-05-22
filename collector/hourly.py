@@ -26,7 +26,7 @@ def run_hourly(
     db_path: Path = DEFAULT_DB,
     force: bool = False,
     skip_html: bool = False,
-    rebuild_html_every: int = 6,
+    rebuild_html_every: int = 1,
 ) -> dict:
     conn = connect(db_path)
     migrate_db(conn)
@@ -86,8 +86,8 @@ def main() -> None:
     parser.add_argument(
         "--rebuild-html-every",
         type=int,
-        default=6,
-        help="HTML alle N Stunden neu bauen (Standard: 6)",
+        default=1,
+        help="HTML alle N Läufe neu bauen (Standard: 1 = jedes Mal)",
     )
     args = parser.parse_args()
     try:

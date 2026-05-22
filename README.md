@@ -46,7 +46,7 @@ Details: **[DEPLOY.md](DEPLOY.md)** · 1 Tag testen: Actions → **Run workflow*
 | **Daten/Lauf** | ~108 Meldungen × vollständiges JSON (~200–400 KB Snapshot) |
 | **1 Jahr** | 365 × 24 ≈ **8.760 Läufe** → ca. **500 MB–2 GB** SQLite |
 
-HTML wird standardmäßig nur alle **6 Stunden** neu gebaut (`--rebuild-html-every 6`).
+Das Dashboard wird nach **jedem** stündlichen Lauf neu gebaut und auf GitHub Pages deployed.
 
 ## Was wird verglichen?
 

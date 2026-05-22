@@ -52,15 +52,10 @@ jobs:
           if [ "${{ inputs.force }}" = "true" ]; then ARGS="--force"; fi
           python -m collector.hourly $ARGS --skip-html
 
-      - name: Rebuild dashboard (every 6th hour, Berlin)
-        run: |
-          H=$(TZ=Europe/Berlin date +%H)
-          if [ "$((10#$H % 6))" -eq 0 ] || [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            python dashboard/build_html.py
-          fi
+      - name: Rebuild dashboard
+        run: python dashboard/build_html.py
 
       - name: Deploy dashboard to GitHub Pages
-        if: hashFiles('dashboard/index.html') != ''
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
