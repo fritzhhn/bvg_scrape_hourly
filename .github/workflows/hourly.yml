@@ -1,10 +1,8 @@
-# Stündlicher BVG-Scrape — SQLite bleibt im Actions-Cache zwischen Läufen.
-# Öffentliches Repo: GitHub Actions Minutes sind kostenlos (Fair Use).
+# Stündlicher BVG-Scrape + Dashboard auf GitHub Pages (Actions-Deploy, nicht README).
 name: BVG hourly scrape
 
 on:
   schedule:
-    # Jede volle Stunde (:00) — Europe/Berlin (passt zu collector berlin_hour)
     - cron: "0 * * * *"
       timezone: Europe/Berlin
   workflow_dispatch:
@@ -15,17 +13,20 @@ on:
         default: false
 
 permissions:
-  contents: write
+  contents: read
   pages: write
   id-token: write
 
 concurrency:
-  group: bvg-hourly
+  group: bvg-pages
   cancel-in-progress: false
 
 jobs:
-  scrape:
+  scrape-and-publish:
     runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,18 +53,26 @@ jobs:
           if [ "${{ inputs.force }}" = "true" ]; then ARGS="--force"; fi
           python -m collector.hourly $ARGS --skip-html
 
-      - name: Rebuild dashboard
+      - name: Build dashboard
         run: python dashboard/build_html.py
 
-      - name: Deploy dashboard to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Prepare static site (only dashboard, not README)
+        run: |
+          mkdir -p site
+          cp dashboard/index.html site/index.html
+          touch site/.nojekyll
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v4
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: dashboard
-          publish_branch: gh-pages
-          keep_files: false
-          user_name: github-actions[bot]
-          user_email: github-actions[bot]@users.noreply.github.com
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
 
       - name: Weekly DB backup artifact
         run: |

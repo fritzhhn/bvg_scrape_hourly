@@ -20,10 +20,9 @@ Cache wird bei **stündlichem** Zugriff nicht wegen Inaktivität gelöscht (7-Ta
 1. Repo auf GitHub anlegen (public): `bvg_scrape_hourly`
 2. Diesen Ordner pushen (inkl. `.github/workflows/hourly.yml`)
 3. **Settings → Actions → General →** Workflow permissions: **Read and write**
-4. **Settings → Pages →** Source: **Deploy from branch** → Branch: `gh-pages` / root  
-   (erscheint nach dem ersten erfolgreichen Lauf)
+4. **Settings → Pages →** Build and deployment → Source: **GitHub Actions** (nicht „Deploy from branch: main“ — sonst siehst du nur die README)
 5. **Actions** → Workflow **BVG hourly scrape** → **Run workflow** (manuell, optional `force`)
-6. Nach 2–3 Läufen: Pages-URL `https://fritzhhn.github.io/bvg_scrape_hourly/` (wenn `index.html` im dashboard-Ordner deployed wird)
+6. Nach erfolgreichem Lauf: **https://fritzhhn.github.io/bvg_scrape_hourly/** (Heatmap-Dashboard, nicht README-Text)
 
 Für einen schnellen Test ohne 1 Stunde warten: mehrfach **Run workflow** klicken (mit `force`), oder Schedule temporär auf `*/15 * * * *` stellen und nach dem Test zurück auf `0 * * * *`.
 
