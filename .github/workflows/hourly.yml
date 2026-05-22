@@ -1,17 +1,14 @@
-# BVG-Störungen alle 20 Minuten (Europe/Berlin :00, :20, :40)
+# BVG-Störungen stündlich (Europe/Berlin :00)
 name: BVG hourly scrape
 
 on:
   schedule:
-    # :00/:20/:40 Berlin; +1 min avoids GitHub load spikes at minute 0 UTC-wide
-    - cron: "1,21,41 * * * *"
+    - cron: "0 * * * *"
       timezone: Europe/Berlin
-  repository_dispatch:
-    types: [scrape]
   workflow_dispatch:
     inputs:
       force:
-        description: "Snapshot auch wenn dieses 20-Min-Fenster schon existiert"
+        description: "Snapshot auch wenn diese Stunde schon existiert"
         type: boolean
         default: false
 
@@ -44,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run collector (20-min slot)
+      - name: Run collector (hourly)
         run: |
           mkdir -p data/logs
           ARGS=""

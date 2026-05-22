@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Periodic scrape: one snapshot per 20-minute slot (Berlin)."""
+"""Periodic scrape: one snapshot per hour (Berlin, :00)."""
 
 from __future__ import annotations
 
@@ -84,7 +84,7 @@ def _build_html() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="BVG-Störungs-Lauf (alle 20 Minuten)")
+    parser = argparse.ArgumentParser(description="BVG-Störungs-Lauf (stündlich)")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--skip-html", action="store_true")

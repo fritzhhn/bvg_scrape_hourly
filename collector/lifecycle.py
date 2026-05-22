@@ -75,14 +75,12 @@ def berlin_today() -> str:
 
 
 def berlin_slot() -> str:
-    """20-minute window id, e.g. 2026-05-22T21:20 (runs at :00, :20, :40)."""
+    """Hour id for snapshot dedupe, e.g. 2026-05-22T21 (runs at :00 Berlin)."""
     now = datetime.now(BERLIN)
-    slot_min = (now.minute // 20) * 20
-    return now.replace(minute=slot_min, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M")
+    return now.replace(minute=0, second=0, microsecond=0).strftime("%Y-%m-%dT%H")
 
 
 def berlin_hour() -> str:
-    """Alias: stored in collected_hour column."""
     return berlin_slot()
 
 
