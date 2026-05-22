@@ -1,14 +1,14 @@
-# Stündlicher BVG-Scrape — ohne github-pages Environment (blockiert Schedule).
+# BVG-Störungen alle 20 Minuten (Europe/Berlin :00, :20, :40)
 name: BVG hourly scrape
 
 on:
   schedule:
-    - cron: "0 * * * *"
+    - cron: "*/20 * * * *"
       timezone: Europe/Berlin
   workflow_dispatch:
     inputs:
       force:
-        description: "Snapshot auch wenn diese Stunde schon existiert"
+        description: "Snapshot auch wenn dieses 20-Min-Fenster schon existiert"
         type: boolean
         default: false
 
@@ -41,7 +41,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Run hourly collector
+      - name: Run collector (20-min slot)
         run: |
           mkdir -p data/logs
           ARGS=""

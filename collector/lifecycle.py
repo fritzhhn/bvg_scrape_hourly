@@ -1,4 +1,4 @@
-"""Track disruption visibility across hourly snapshots."""
+"""Track disruption visibility across periodic snapshots (20-minute slots)."""
 
 from __future__ import annotations
 
@@ -74,20 +74,32 @@ def berlin_today() -> str:
     return datetime.now(BERLIN).date().isoformat()
 
 
+def berlin_slot() -> str:
+    """20-minute window id, e.g. 2026-05-22T21:20 (runs at :00, :20, :40)."""
+    now = datetime.now(BERLIN)
+    slot_min = (now.minute // 20) * 20
+    return now.replace(minute=slot_min, second=0, microsecond=0).strftime("%Y-%m-%dT%H:%M")
+
+
 def berlin_hour() -> str:
-    return datetime.now(BERLIN).strftime("%Y-%m-%dT%H")
+    """Alias: stored in collected_hour column."""
+    return berlin_slot()
 
 
-def snapshot_exists_for_hour(conn: sqlite3.Connection, hour: str) -> int | None:
+def snapshot_exists_for_slot(conn: sqlite3.Connection, slot: str) -> int | None:
     row = conn.execute(
         "SELECT id FROM snapshots WHERE collected_hour = ? ORDER BY id DESC LIMIT 1",
-        (hour,),
+        (slot,),
     ).fetchone()
     return int(row["id"]) if row else None
 
 
+def snapshot_exists_for_hour(conn: sqlite3.Connection, hour: str) -> int | None:
+    return snapshot_exists_for_slot(conn, hour)
+
+
 def get_last_two_snapshots(conn: sqlite3.Connection) -> tuple[sqlite3.Row | None, sqlite3.Row | None]:
-    """Latest snapshot and the immediately previous one (hourly comparison)."""
+    """Latest snapshot and the immediately previous one."""
     rows = conn.execute(
         """
         SELECT id, collected_at, collected_day, collected_hour, total_found

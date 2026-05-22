@@ -10,7 +10,7 @@ from pathlib import Path
 
 from collector.api import fetch_all_disruptions, search_station
 from collector.db import DEFAULT_DB, connect, get_cached_geocode, init_db, migrate, save_snapshot, set_cached_geocode
-from collector.lifecycle import berlin_hour, berlin_today, migrate as migrate_lifecycle, update_lifecycle
+from collector.lifecycle import berlin_slot, berlin_today, migrate as migrate_lifecycle, update_lifecycle
 from collector.normalize import normalize_disruption
 
 
@@ -66,7 +66,7 @@ def run_collect(
     migrate(conn)
     migrate_lifecycle(conn)
     day = collected_day or berlin_today()
-    hour = collected_hour or berlin_hour()
+    hour = collected_hour or berlin_slot()
 
     print(f"Fetching disruptions (type={disruption_type}, timeFrame={time_frame})...")
     raw_items = fetch_all_disruptions(
@@ -112,7 +112,7 @@ def run_collect(
     ).fetchone()
     update_lifecycle(conn, snapshot_id, snap["collected_at"], day, hour, records)
     conn.close()
-    print(f"Saved snapshot #{snapshot_id} ({hour}) to {db_path}")
+    print(f"Saved snapshot #{snapshot_id} (slot {hour}) to {db_path}")
     return snapshot_id
 
 

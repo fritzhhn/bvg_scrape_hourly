@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Hourly scrape: one snapshot per hour (Berlin), full JSON, compare with previous hour."""
+"""Periodic scrape: one snapshot per 20-minute slot (Berlin)."""
 
 from __future__ import annotations
 
@@ -11,11 +11,11 @@ from pathlib import Path
 from collector.collect import run_collect
 from collector.db import DEFAULT_DB, connect, migrate as migrate_db
 from collector.lifecycle import (
-    berlin_hour,
+    berlin_slot,
     compare_snapshots,
     get_last_two_snapshots,
     migrate,
-    snapshot_exists_for_hour,
+    snapshot_exists_for_slot,
 )
 
 DASHBOARD_BUILDER = Path(__file__).resolve().parent.parent / "dashboard" / "build_html.py"
@@ -32,18 +32,18 @@ def run_hourly(
     migrate_db(conn)
     migrate(conn)
 
-    hour = berlin_hour()
-    existing = snapshot_exists_for_hour(conn, hour)
+    slot = berlin_slot()
+    existing = snapshot_exists_for_slot(conn, slot)
     snapshot_count = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
     conn.close()
 
     if existing and not force:
-        print(f"Snapshot für {hour} existiert bereits (#{existing}). Überspringen (--force).")
+        print(f"Snapshot für {slot} existiert bereits (#{existing}). Überspringen (--force).")
         if not skip_html and snapshot_count % rebuild_html_every == 0:
             _build_html()
-        return {"skipped": True, "snapshot_id": existing, "hour": hour}
+        return {"skipped": True, "snapshot_id": existing, "slot": slot}
 
-    snapshot_id = run_collect(db_path, geocode=True)
+    snapshot_id = run_collect(db_path, geocode=True, collected_hour=slot)
 
     conn = connect(db_path)
     migrate(conn)
@@ -67,7 +67,7 @@ def run_hourly(
     return {
         "skipped": False,
         "snapshot_id": snapshot_id,
-        "hour": hour,
+        "slot": slot,
         "comparison": comparison,
         "total_snapshots": total,
         "db_bytes": db_size,
@@ -79,7 +79,7 @@ def _build_html() -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Stündlicher BVG-Störungs-Lauf")
+    parser = argparse.ArgumentParser(description="BVG-Störungs-Lauf (alle 20 Minuten)")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--force", action="store_true")
     parser.add_argument("--skip-html", action="store_true")

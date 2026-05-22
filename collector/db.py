@@ -242,11 +242,11 @@ def save_snapshot(
     collected_day: str | None = None,
     collected_hour: str | None = None,
 ) -> int:
-    from collector.lifecycle import berlin_hour, berlin_today
+    from collector.lifecycle import berlin_slot, berlin_today
 
     collected_at = datetime.now(timezone.utc).isoformat()
     day = collected_day or berlin_today()
-    hour = collected_hour or berlin_hour()
+    hour = collected_hour or berlin_slot()
     cur = conn.execute(
         """
         INSERT INTO snapshots (
