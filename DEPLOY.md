@@ -1,6 +1,6 @@
 # Deploy: GitHub Actions (öffentliches Repo)
 
-Für `fritzhhn/bvg_scrape_hourly` — Lauf alle **20 Minuten** ohne eigenen Server.
+Für `fritzhhn/bvg_scrape_hourly` — **stündlicher** Lauf ohne eigenen Server.
 
 ## Ist das ein Problem?
 
@@ -9,8 +9,8 @@ Für `fritzhhn/bvg_scrape_hourly` — Lauf alle **20 Minuten** ohne eigenen Serv
 | **Kosten** | Actions-Minuten in der Regel **kostenlos** |
 | **1 Jahr** | Ja, Schedule läuft dauerhaft |
 | **SQLite** | Persistiert via **Actions Cache** (`data/disruptions.db`) |
-| **Zeitplan** | **:00, :20, :40 Europe/Berlin** (`cron: "1,21,41 * * * *"` + `timezone`) |
-| **Genauigkeit** | GitHub kann den Start um **5–15 Min** verschieben; an vollen UTC-Stunden ist die Last höher |
+| **Zeitplan** | Jede volle Stunde **:00 Europe/Berlin** (`cron: "0 * * * *"` + `timezone`) |
+| **Genauigkeit** | GitHub kann den Start um **5–15 Min** verschieben (oft an vollen UTC-Stunden) |
 | **Backup** | Sonntags Artifact (90 Tage); für 1 Jahr ggf. zusätzlich manuell sichern |
 
 Cache wird bei **stündlichem** Zugriff nicht wegen Inaktivität gelöscht (7-Tage-Regel gilt nur ohne Zugriff).
@@ -26,26 +26,13 @@ Cache wird bei **stündlichem** Zugriff nicht wegen Inaktivität gelöscht (7-Ta
 
 Für einen schnellen Test: **Run workflow** (optional `force`).
 
-## Wenn `schedule` nicht startet (0 Läufe mit Event „schedule“)
+## Wenn `schedule` nicht startet
 
-Die Workflow-Datei ist korrekt ([GitHub-Doku: `schedule`](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#schedule)): nur auf **`main`**, min. alle 5 Min, optional `timezone: Europe/Berlin`.
+Viele Nutzer berichten, dass der **erste** Cron-Lauf bei neuen Repos **verzögert** ist (Minuten bis Stunden, vereinzelt länger) — siehe [DevOps Journal / Xebia](https://devopsjournal.io/blog/2022/08/12/workflows-not-starting). In der Actions-Liste fehlt oft ein „Uhr“-Icon; das ist normal.
 
-**Geprüft auf diesem Repo:** `workflow_dispatch` und `repository_dispatch` laufen; **`schedule` hat bisher keinen einzigen Lauf ausgelöst** (auch kein Test mit `*/15 * * * *` UTC). Das ist kein lokales Script-Problem, sondern dass der **GitHub-Scheduler** das Repo noch nicht triggert (bei neuen Repos Berichten zufolge oft Stunden bis zum ersten Lauf; manchmal muss der Workflow in der UI reaktiviert werden).
+**Repo-Settings (geprüft):** Actions erlaubt, Workflow-Permissions auf **Read and write** gestellt (`Settings → Actions → General`).
 
-**In der UI prüfen:** Actions → **BVG hourly scrape** → steht dort „Scheduled workflows disabled“ / **Enable workflow**?
-
-**Fallback ohne Rechner bei dir (läuft trotzdem auf GitHub Actions):** kostenloser Dienst z. B. [cron-job.org](https://cron-job.org) alle 20 Min:
-
-```http
-POST https://api.github.com/repos/fritzhhn/bvg_scrape_hourly/dispatches
-Authorization: Bearer <PAT mit repo scope>
-Accept: application/vnd.github+json
-Content-Type: application/json
-
-{"event_type":"scrape"}
-```
-
-Der Workflow hat `repository_dispatch: types: [scrape]` — gleicher Ablauf wie manuell, nur extern getaktet.
+**Test-Repo:** https://github.com/fritzhhn/gh-schedule-test — minimaler `*/15 * * * *` Workflow nach Doku. Wenn dort `schedule`-Läufe erscheinen, der Haupt-Workflow aber nicht, liegt es am BVG-Repo; wenn nirgends, am GitHub-Konto/Scheduler.
 
 ## Lokal → GitHub
 
