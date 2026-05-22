@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 from collector.collect import run_collect
-from collector.db import DEFAULT_DB, connect, migrate as migrate_db
+from collector.db import DEFAULT_DB, connect, delete_snapshot, migrate as migrate_db
 from collector.lifecycle import (
     berlin_slot,
     compare_snapshots,
@@ -35,14 +35,19 @@ def run_hourly(
     slot = berlin_slot()
     existing = snapshot_exists_for_slot(conn, slot)
     snapshot_count = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
-    conn.close()
 
     if existing and not force:
+        conn.close()
         print(f"Snapshot für {slot} existiert bereits (#{existing}). Überspringen (--force).")
         if not skip_html and snapshot_count % rebuild_html_every == 0:
             _build_html()
         return {"skipped": True, "snapshot_id": existing, "slot": slot}
 
+    if existing and force:
+        delete_snapshot(conn, existing)
+        print(f"Vorhandenen Snapshot #{existing} für {slot} ersetzt (--force).")
+
+    conn.close()
     snapshot_id = run_collect(db_path, geocode=True, collected_hour=slot)
 
     conn = connect(db_path)

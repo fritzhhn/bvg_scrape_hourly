@@ -233,6 +233,18 @@ def _record_to_row(rec: dict[str, Any]) -> tuple:
     )
 
 
+def delete_snapshot(conn: sqlite3.Connection, snapshot_id: int) -> None:
+    conn.execute("DELETE FROM snapshots WHERE id = ?", (snapshot_id,))
+    conn.commit()
+
+
+def _dedupe_records(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    by_id: dict[str, dict[str, Any]] = {}
+    for rec in records:
+        by_id[rec["disruption_id"]] = rec
+    return list(by_id.values())
+
+
 def save_snapshot(
     conn: sqlite3.Connection,
     records: list[dict[str, Any]],
@@ -244,6 +256,7 @@ def save_snapshot(
 ) -> int:
     from collector.lifecycle import berlin_slot, berlin_today
 
+    records = _dedupe_records(records)
     collected_at = datetime.now(timezone.utc).isoformat()
     day = collected_day or berlin_today()
     hour = collected_hour or berlin_slot()

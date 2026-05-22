@@ -64,7 +64,12 @@ def fetch_all_disruptions(
             session=session,
         )
         elements.extend(data.get("elements") or [])
-    return elements
+    by_id: dict[str, dict[str, Any]] = {}
+    for el in elements:
+        key = str(el.get("id", ""))
+        if key:
+            by_id[key] = el
+    return list(by_id.values())
 
 
 def search_station(name: str, session: requests.Session | None = None) -> dict[str, float] | None:
