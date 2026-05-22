@@ -53,13 +53,19 @@ jobs:
 
       - name: Publish dashboard to main (GitHub Pages)
         run: |
-          cp dashboard/index.html index.html
-          touch .nojekyll
+          cp dashboard/index.html /tmp/bvg-dashboard.html
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
+          git fetch origin main
+          git reset --hard origin/main
+          cp /tmp/bvg-dashboard.html index.html
+          touch .nojekyll
           git add index.html .nojekyll
-          git diff --staged --quiet || git commit -m "Dashboard update [skip ci]"
-          git pull --rebase origin main
+          if git diff --staged --quiet; then
+            echo "Dashboard unchanged, skip push"
+            exit 0
+          fi
+          git commit -m "Dashboard update [skip ci]"
           git push origin main
 
       - name: Weekly DB backup artifact
