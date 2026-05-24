@@ -14,6 +14,7 @@ sys.path.insert(0, str(ROOT))
 
 from collector.db import connect
 from collector.lifecycle import compare_snapshots, get_last_two_snapshots, load_history_stats, migrate
+from dashboard.insights import compute_insights, empty_insights
 
 DB_PATH = Path(__file__).resolve().parent.parent / "data" / "disruptions.db"
 OUT_PATH = Path(__file__).resolve().parent / "index.html"
@@ -61,6 +62,7 @@ def empty_payload() -> dict:
             "longestVisible": [],
             "recentlyEnded": [],
         },
+        "insights": empty_insights(),
     }
 
 
@@ -131,6 +133,15 @@ def load_payload(db_path: Path) -> dict:
         comparison["prevHour"] = prev["collected_hour"] or prev["collected_day"]
         comparison["currHour"] = curr["collected_hour"] or curr["collected_day"]
     history = load_history_stats(conn2)
+    dis_list = list(disruptions.values())
+    insights = compute_insights(
+        conn2,
+        snapshot_id=snap["id"],
+        disruptions=dis_list,
+        points=points,
+        history=history,
+        comparison=comparison,
+    )
     conn2.close()
 
     return {
@@ -148,6 +159,7 @@ def load_payload(db_path: Path) -> dict:
         "points": points,
         "comparison": comparison,
         "history": history,
+        "insights": insights,
     }
 
 
@@ -243,6 +255,41 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       margin-bottom: 1rem;
       color: var(--text);
     }
+    .section-title {
+      font-size: 1.15rem;
+      margin: 0 0 .35rem;
+      color: var(--bvg);
+    }
+    .section-lead {
+      margin: 0 0 1rem;
+      font-size: .88rem;
+      color: var(--muted);
+      max-width: 72ch;
+    }
+    .insight-narratives {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: .75rem;
+      margin-bottom: 1rem;
+    }
+    .insight-card {
+      background: #222633;
+      border-left: 4px solid var(--bvg);
+      border-radius: 8px;
+      padding: .85rem 1rem;
+    }
+    .insight-card h3 { margin: 0 0 .4rem; font-size: .92rem; }
+    .insight-card p { margin: 0; font-size: .84rem; color: #c8cdd8; }
+    .insight-card.warn { border-left-color: var(--accent); }
+    .insight-card.highlight { border-left-color: #6bc9a8; }
+    .insight-card.muted { border-left-color: var(--muted); }
+    .kpi-insights {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      gap: .5rem;
+      margin-bottom: 1rem;
+    }
+    .kpi-insights .metric strong { font-size: 1.25rem; }
   </style>
 </head>
 <body>
@@ -259,6 +306,32 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       Noch keine Scrape-Daten. Die Karte zeigt Berlin — nach dem ersten stündlichen Lauf (oder Actions-Run) erscheinen Störungen hier.
     </div>
     <div class="metrics" id="metrics"></div>
+
+    <section class="card" id="insights-section">
+      <h2 class="section-title">Mobilität &amp; Gerechtigkeit</h2>
+      <p class="section-lead">
+        Auswertung der BVG-Störungsmeldungen: Wer ist wie stark betroffen?
+        Barrierefreiheit, Innen- vs. Außenstadt, Verkehrsmittel und Dauerbelastung — aus euren Scrape-Daten, nicht amtliche Sozialstatistik.
+      </p>
+      <div class="insight-narratives" id="insight-narratives"></div>
+      <div class="kpi-insights" id="insight-kpis"></div>
+      <div class="charts" style="margin-bottom:1rem">
+        <div class="chart-box" style="height:240px"><canvas id="chart-rings"></canvas></div>
+        <div class="chart-box" style="height:240px"><canvas id="chart-causes"></canvas></div>
+        <div class="chart-box" style="height:240px"><canvas id="chart-mode-equity"></canvas></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem">
+        <div>
+          <h3 style="font-size:.9rem;margin:0 0 .5rem">Aufzug-Störungen nach Station</h3>
+          <table><thead><tr><th>Station</th><th>#</th></tr></thead><tbody id="tbl-elevators"></tbody></table>
+        </div>
+        <div>
+          <h3 style="font-size:.9rem;margin:0 0 .5rem">Langläufer (mehrere Tage sichtbar)</h3>
+          <table><thead><tr><th>Meldung</th><th>Tage</th><th>Std.</th></tr></thead><tbody id="tbl-chronic"></tbody></table>
+        </div>
+      </div>
+    </section>
+
     <div class="filters">
       <label>Meldungstyp
         <select id="f-type"><option value="">Alle</option></select>
@@ -566,9 +639,93 @@ HTML_TEMPLATE = """<!DOCTYPE html>
       }
     }
 
+    function renderInsights() {
+      const ins = DATA.insights || {};
+      const narr = ins.narratives || [];
+      document.getElementById("insight-narratives").innerHTML = narr.map(n => `
+        <div class="insight-card ${n.tone||"info"}">
+          <h3>${n.title}</h3>
+          <p>${n.text}</p>
+        </div>`).join("");
+
+      const kpis = ins.kpis || [];
+      document.getElementById("insight-kpis").innerHTML = kpis.map(k => `
+        <div class="metric">
+          <strong>${k.value}</strong>
+          <span>${k.label}</span>
+          <span style="font-size:.7rem;display:block;margin-top:.2rem;color:var(--muted)">${k.hint||""}</span>
+        </div>`).join("");
+
+      document.getElementById("tbl-elevators").innerHTML = (ins.elevatorHotspots||[]).map(r =>
+        `<tr><td>${r.station}</td><td>${r.count}</td></tr>`).join("")
+        || "<tr><td colspan=2>Keine Aufzug-Meldungen</td></tr>";
+
+      document.getElementById("tbl-chronic").innerHTML = (ins.chronicLeaders||[]).map(r =>
+        `<tr><td>${(r.headline||"").slice(0,48)}</td><td>${r.days}</td><td>${r.hours}</td></tr>`).join("")
+        || "<tr><td colspan=3>Noch keine Langläufer in der Historie</td></tr>";
+
+      if (ins.ringShare && ins.ringShare.length) {
+        if (charts["chart-rings"]) charts["chart-rings"].destroy();
+        charts["chart-rings"] = new Chart(document.getElementById("chart-rings"), {
+          type: "doughnut",
+          data: {
+            labels: ins.ringShare.map(r => r.ring),
+            datasets: [{
+              data: ins.ringShare.map(r => r.count),
+              backgroundColor: ["#f0d722cc", "#c41e3a99", "#6bc9a899", "#4a7ab8aa"]
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              title: { display: true, text: "Räumliche Last (Haltestellenpunkte)", color: "#9aa3b2", font: { size: 12 } },
+              legend: { labels: { color: "#e8eaef" } }
+            }
+          }
+        });
+      }
+      if (ins.causeShare && ins.causeShare.length) {
+        barChart("chart-causes", ins.causeShare.map(c => [c.cause, c.count]).slice(0,8), "Ursachen");
+        const ctx = document.getElementById("chart-causes");
+        if (charts["chart-causes"]) {
+          charts["chart-causes"].options.plugins.title = {
+            display: true, text: "Ursachenkategorien (sozial relevant)", color: "#9aa3b2", font: { size: 12 }
+          };
+          charts["chart-causes"].update();
+        }
+      }
+      if (ins.modeShare && ins.modeShare.length) {
+        if (charts["chart-mode-equity"]) charts["chart-mode-equity"].destroy();
+        charts["chart-mode-equity"] = new Chart(document.getElementById("chart-mode-equity"), {
+          type: "bar",
+          data: {
+            labels: ins.modeShare.map(m => m.mode),
+            datasets: [{
+              label: "% der Meldungen",
+              data: ins.modeShare.map(m => m.pct),
+              backgroundColor: ins.modeShare.map(m =>
+                ["Bus","Tram","Ersatzverkehr"].includes(m.mode) ? "#c41e3a99" : "#f0d722aa")
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: {
+              title: { display: true, text: "Last nach Verkehrsmittel (rot = oft Randnetz)", color: "#9aa3b2", font: { size: 12 } },
+              legend: { display: false }
+            },
+            scales: {
+              x: { ticks: { color: "#9aa3b2" }, grid: { color: "#2a3042" } },
+              y: { max: 100, ticks: { color: "#9aa3b2", callback: v => v+"%" }, grid: { color: "#2a3042" } }
+            }
+          }
+        });
+      }
+    }
+
     initFilters();
     refresh();
     renderHistory();
+    renderInsights();
   </script>
 </body>
 </html>
